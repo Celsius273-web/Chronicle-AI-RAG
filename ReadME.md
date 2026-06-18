@@ -1,4 +1,4 @@
-Chronicle-AI-RAG: Retrieval Augmented News Intelligence System
+###Chronicle-AI-RAG: Retrieval Augmented News Intelligence System
 
 This is an end to end Retrieval Augmented Generation (RAG) system that automates content ingestion from RSS feeds, chunks and indexes data using semantic vector embeddings, and generates context grounded answers through Google's Gemini models. This project is a combination of web scraping, information retrieval, and LLM synthesis into a single workflow.
 
