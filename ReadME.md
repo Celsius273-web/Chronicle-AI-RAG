@@ -1,6 +1,8 @@
-# GPT-2 LoRA Fine-Tuning for Instruction Following and Financial QA
+# GPT-2 LoRA Fine Tuning for Instruction Following and Financial QA
 
-Fine-tuned GPT-2 with Low-Rank Adaptation (LoRA) on a mixture of instruction-following (Dolly-15k) and financial reasoning (FinQA) datasets using only local hardware. This project implements a parameter efficient adapter that drastically improves instruction adherence and eliminates structural text repetition loops compared to the un-tuned base model.
+Tech Stack: Python, PyTorch, Hugging Face Transformers, PEFT, LoRA, GPT-2
+
+Fine-tuned GPT-2 with Low-Rank Adaptation (LoRA) on a mixture of instruction-following (Dolly-15k) and financial reasoning (FinQA) datasets. GPT-2 was intentionally selected to balance model capability with the compute and memory limitations of my laptop hardware.
 
 ### Skills Demonstrated
 
@@ -16,9 +18,9 @@ Fine-tuned GPT-2 with Low-Rank Adaptation (LoRA) on a mixture of instruction-fol
 
 A manual evaluation of **30 test prompts** was conducted to compare the base pre-trained model directly against the LoRA-aligned model.
 
-### Key Performance Metrics
+### Findings
 
-* **100% Elimination of Degenerate Repetition Loops:** Out of 30 test prompts, the base GPT-2 model fell into infinite loop repetitions on **24/30 prompts (80%)**. The LoRA fine-tuned model successfully broke out of these loops on **30/30 prompts (100%)**.
+* **Repetition Loop Recovery:** The base GPT-2 model entered repetitive generation patterns on 24/30 prompts. The LoRA model produced non-repetitive outputs on all 24 affected prompts.
 
 
 * **Instruction Format Adherence:** The fine-tuned model correctly adopted the structured `Instruction/Input/Output` framing or responded with direct summary outputs rather than echoing the prompt question.
@@ -40,29 +42,15 @@ A manual evaluation of **30 test prompts** was conducted to compare the base pre
 
 ## Project Architecture
 
-```text
-  [ Databricks Dolly 15k ]       [ FinQA Financial Dataset ]
-             \                               /
-              \                             /
-             [ prepdata.py: Clean, Cap, & Format ]
-                            │
-                     (train / val split)
-                            │
-                     [ tune.py: Training ]
-           ┌────────────────┴────────────────┐
-           ▼                                 ▼
-    [ Freeze Base GPT-2 ]           [ Target c_attn Layers ]
-           │                                 │
-           └────────────────┬────────────────┘
-                            ▼
-                    [ LoRA Adapter PEFT ]
-                            │
-               [ inference.py: Evaluation ]
-                            │
-               [ model_comparison.json Results ]
-
-```
-
+Dolly-15k + FinQA
+↓
+Preprocessing
+↓
+GPT-2 + LoRA
+↓
+Evaluation
+↓
+Comparison Results
 ---
 
 ## Pipeline & Implementation Details
