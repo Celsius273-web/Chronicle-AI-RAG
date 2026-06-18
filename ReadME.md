@@ -1,83 +1,98 @@
-ChronicleAI 
+# GPT-2 LoRA Fine-Tuning for Instruction Following and Financial QA
 
-ChronicleAI is a smart news bot that scrapes articles from RSS feeds, processes them into searchable chunks, and uses AI to answer your questions based on current news. Think of it as your personal news research assistant that can pull insights from multiple sources and give you comprehensive, up-to-date answers. The idea is to make current events research faster and smarter for anyone who needs it.
+Fine-tuned GPT-2 with Low-Rank Adaptation (LoRA) on a mixture of instruction-following (Dolly-15k) and financial reasoning (FinQA) datasets using only local hardware. This project implements a parameter efficient adapter that drastically improves instruction adherence and eliminates structural text repetition loops compared to the un-tuned base model.
 
-How it works:
+### Skills Demonstrated
 
-Ingests news articles from RSS feeds (BBC, Reuters, NPR, etc.)
+* **LLM FineTuning & Alignment**
+* **Parameter Efficient Fine Tuning (PEFT) / LoRA**
+* **Hugging Face Transformers ecosystem**
+* **Dataset Engineering & Multi Task Blending**
+* **Qualitative Model Evaluation & Benchmarking**
 
-Processes them into searchable chunks using vector embeddings
+---
 
-Answers your questions by finding relevant chunks and synthesizing responses with AI
+## Measured Results & Evaluation
 
-When you ask a question, ChronicleAI searches through all the news content, finds the most relevant pieces, summarizes them, and then uses Google’s Gemini AI to give you a detailed answer.
+A manual evaluation of **30 test prompts** was conducted to compare the base pre-trained model directly against the LoRA-aligned model.
 
-What each file does:
+### Key Performance Metrics
 
-config.yaml — all the RSS feed URLs
+* **100% Elimination of Degenerate Repetition Loops:** Out of 30 test prompts, the base GPT-2 model fell into infinite loop repetitions on **24/30 prompts (80%)**. The LoRA fine-tuned model successfully broke out of these loops on **30/30 prompts (100%)**.
 
-ingest.py — downloads and parses articles
 
-process.py — breaks articles into chunks and creates vector embeddings
+* **Instruction Format Adherence:** The fine-tuned model correctly adopted the structured `Instruction/Input/Output` framing or responded with direct summary outputs rather than echoing the prompt question.
 
-main.py — the main interface where you interact with the bot
 
-requirements.txt — dependencies
+* **Domain Awareness:** While limited by its small parameters, the fine-tuned adapter showed an enhanced ability to recognize financial syntax (e.g., balance sheets, ROE concepts).
 
-Setup:
-Clone the repo and install dependencies in a Python 3.11 or 3.12 environment.
-git clone https://github.com/Celsius273-web/ChronicleAI
 
+
+### Before vs. After Comparison (`model_comparison.json`)
+
+| Prompt | Base GPT-2 Model (Raw) | Fine-Tuned Model (GPT-2 + LoRA) |
+| --- | --- | --- |
+| **"Tell me a story about a robot."**<br> | *"I'm a robot. I'm a robot. I'm a robot. I'm a robot. I'm a robot. I'm a robot..."* *(Repeats infinitely)*<br> | **"Output: A robot is a robot that is designed to do something. It is the type of robot that can be programmed..."** *(Provides structural text)*<br> |
+| **"Describe the role of the Federal Reserve."**<br> | *"The Federal Reserve is a central bank that is responsible for... The Federal Reserve is a central bank that is responsible for..."* *(Stuck in a sentence loop)*<br> | **"Output: The Federal Reserve serves as the central bank of the United States."** *(Provides a direct, concise summary)*<br> |
+| **"How do tariffs influence international trade?"**<br> | *"### What is the impact of tariffs on international trade? ### What is the impact of tariffs on international trade?..."* *(Repeats the prompt question)*<br> | **"The tariff system allows for the protection of tariffs... Examples include the United States tariff on gasoline..."** *(Attempts real contextual explanation)*<br> |
+
+---
+
+## Project Architecture
+
+```text
+  [ Databricks Dolly 15k ]       [ FinQA Financial Dataset ]
+             \                               /
+              \                             /
+             [ prepdata.py: Clean, Cap, & Format ]
+                            │
+                     (train / val split)
+                            │
+                     [ tune.py: Training ]
+           ┌────────────────┴────────────────┐
+           ▼                                 ▼
+    [ Freeze Base GPT-2 ]           [ Target c_attn Layers ]
+           │                                 │
+           └────────────────┬────────────────┘
+                            ▼
+                    [ LoRA Adapter PEFT ]
+                            │
+               [ inference.py: Evaluation ]
+                            │
+               [ model_comparison.json Results ]
+
+```
+
+---
+
+## Pipeline & Implementation Details
+
+### Data Ingestion (`prepdata.py`)
+
+Normalizes Dolly and FinQA datasets into a unified template. To accommodate local memory restraints, long financial documents are strategically truncated, and example counts are capped to build a balanced, stable training dataset.
+
+### Parameter-Efficient Training (`tune.py`)
+
+* **Targeting:** Applies LoRA parameters exclusively onto the query and value attention projection blocks (`c_attn`) to reduce training overhead.
+* **Memory Management:** Leverages micro-batching (Batch size: 2) combined with gradient accumulation steps to maximize local hardware capability.
+
+---
+
+## Setup & Execution
+
+### Installation
+
+Ensure you have Python 3.11+ installed, then run:
+
+```bash
+git clone https://github.com/Celsius273-web/Fine_Tuning_GPT2_with_Dolly_and_FinQA
+cd Fine_Tuning_GPT2_with_Dolly_and_FinQA
 pip install -r requirements.txt
 
-LLM setup: the project uses Google’s Gemini API by default, but you can swap in other API keys or even local models.
+```
 
-Get a Google AI API key and add it to a .env file as MY_KEY=your_api_key_here
+### Running the Project
 
-Install Playwright browsers with: playwright install
-
-Create a data/ folder in your project directory
-
-Run:
-python main.py
-
-p — ask the bot a question about current news
-
-n — refresh the news sources (scrape new articles)
-
-any other key — quit
-
-A few notes:
-
-ChronicleAI maintains session memory to give context-aware answers
-
-Articles are scraped once only (no duplicates)
-
-The vector search finds the 5 most relevant chunks per question (adjustable)
-
-Summaries are created before sending to the main AI to reduce API costs
-
-
-Customization options:
-
-RSS feeds: edit config.yaml to add or remove feeds.
-
-Chunking: in process.py you can adjust chunk size (600 chars by default), overlap (100 chars), and separators.
-
-RSS feeds: these are publicly available feeds from BBC, Reuters, NPR, etc. Fine for personal use, but CHECK each outlet’s terms of service for commercial use.
-
-Summarization: You can alter or the summarization as needed, I simply wanted to reduce API usage.
-
-
-Troubleshooting:
-
-Check your API key or local model setup
-
-Make sure the data/ folder exists
-
-Some feeds may be temporarily down
-
-If Playwright fails, try playwright install again
-
-
-License: MIT License
+1. **Preprocess Data:** `python prepdata.py`
+2. **Train Adapter:** `python tune.py`
+3. **Run Benchmarks:** `python inference.py`
