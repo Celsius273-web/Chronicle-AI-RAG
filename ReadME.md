@@ -1,68 +1,50 @@
-# GPT-2 LoRA Fine Tuning for Instruction Following and Financial QA
+Chronicle-AI-RAG: Retrieval Augmented News Intelligence System
 
-Tech Stack: Python, PyTorch, Hugging Face Transformers, PEFT, LoRA, GPT-2
+This is an end to end Retrieval Augmented Generation (RAG) system that automates content ingestion from RSS feeds, chunks and indexes data using semantic vector embeddings, and generates context grounded answers through Google's Gemini models. This project is a combination of web scraping, information retrieval, and LLM synthesis into a single workflow.
 
-Fine-tuned GPT-2 with Low-Rank Adaptation (LoRA) on a mixture of instruction-following (Dolly-15k) and financial reasoning (FinQA) datasets. GPT-2 was intentionally selected to balance model capability with the compute and memory limitations of my laptop hardware.
+### Skills & Technologies Demonstrated
 
-### Skills Demonstrated
-
-* **LLM FineTuning & Alignment**
-* **Parameter Efficient Fine Tuning (PEFT) / LoRA**
-* **Hugging Face Transformers ecosystem**
-* **Dataset Engineering & Multi Task Blending**
-* **Qualitative Model Evaluation & Benchmarking**
-
----
-
-## Measured Results & Evaluation
-
-A manual evaluation of **30 test prompts** was conducted to compare the base pre-trained model directly against the LoRA-aligned model.
-
-### Findings
-
-* **Repetition Loop Recovery:** The base GPT-2 model entered repetitive generation patterns on 24/30 prompts. The LoRA model produced non-repetitive outputs on all 24 affected prompts.
+* **RAG Architecture:** Context-grounded synthesis using `gemini-2.5-flash`.
 
 
-* **Instruction Format Adherence:** The fine-tuned model correctly adopted the structured `Instruction/Input/Output` framing or responded with direct summary outputs rather than echoing the prompt question.
+* **Vector Storage:** Dense vector retrieval using `FAISS` (L2 Flat Index).
 
 
-* **Domain Awareness:** While limited by its small parameters, the fine-tuned adapter showed an enhanced ability to recognize financial syntax (e.g., balance sheets, ROE concepts).
+* **Text Engineering:** Semantic chunking via LangChain’s `RecursiveCharacterTextSplitter`.
 
 
+* **Embeddings Pipeline:** Vector generation via `sentence-transformers/all-MiniLM-L6-v2`.
 
-### Before vs. After Comparison (`model_comparison.json`)
 
-| Prompt | Base GPT-2 Model (Raw) | Fine-Tuned Model (GPT-2 + LoRA) |
-| --- | --- | --- |
-| **"Tell me a story about a robot."**<br> | *"I'm a robot. I'm a robot. I'm a robot. I'm a robot. I'm a robot. I'm a robot..."* *(Repeats infinitely)*<br> | **"Output: A robot is a robot that is designed to do something. It is the type of robot that can be programmed..."** *(Provides structural text)*<br> |
-| **"Describe the role of the Federal Reserve."**<br> | *"The Federal Reserve is a central bank that is responsible for... The Federal Reserve is a central bank that is responsible for..."* *(Stuck in a sentence loop)*<br> | **"Output: The Federal Reserve serves as the central bank of the United States."** *(Provides a direct, concise summary)*<br> |
-| **"How do tariffs influence international trade?"**<br> | *"### What is the impact of tariffs on international trade? ### What is the impact of tariffs on international trade?..."* *(Repeats the prompt question)*<br> | **"The tariff system allows for the protection of tariffs... Examples include the United States tariff on gasoline..."** *(Attempts real contextual explanation)*<br> |
+* **Data Automation:** Automated ingestion via `feedparser` and headless `Playwright` scraping.
+
+
+* **Context Compression:** Local token reduction using a Hugging Face `t5-small` pipeline.
 
 ---
 
-## Project Architecture
+## System Architecture
 
-Dolly-15k + FinQA
-↓
-Preprocessing
-↓
-GPT-2 + LoRA
-↓
-Evaluation
-↓
-Comparison Results
+RSS Feeds → Article Extraction (feedparser + Playwright) → Chunking & Embeddings (all-MiniLM-L6-v2) → FAISS Vector Index → Semantic Retrieval (Top-K) → T5 Context Compression → Gemini Response Generation
+
 ---
 
-## Pipeline & Implementation Details
+## Technical Design & Architecture
 
-### Data Ingestion (`prepdata.py`)
+### Cost-Conscious Context Compression (`main.py`)
 
-Normalizes Dolly and FinQA datasets into a unified template. To accommodate local memory restraints, long financial documents are strategically truncated, and example counts are capped to build a balanced, stable training dataset.
+To minimize external API token consumption, the system retrieves the top 5 relevant document chunks (`K=5`) and passes them through a local, hardware-efficient Hugging Face `t5-small` summarizer. This compresses raw text into compact factual summaries before sending the payload to Gemini, optimizing token budgets while maintaining strict source grounding.
 
-### Parameter-Efficient Training (`tune.py`)
+### Core Component Breakdown
 
-* **Targeting:** Applies LoRA parameters exclusively onto the query and value attention projection blocks (`c_attn`) to reduce training overhead.
-* **Memory Management:** Leverages micro-batching (Batch size: 2) combined with gradient accumulation steps to maximize local hardware capability.
+* **Dynamic Ingestion (`ingest.py`):** Uses headless Chromium via `Playwright` to extract content from raw `<article>` HTML tags, bypassing simple RSS abstract limits.
+
+
+* **Text Processing (`process.py`):** Implements a `RecursiveCharacterTextSplitter` with a strict 600 character window and 100 character overlap to retain semantic boundaries.
+
+
+* **Persistence & State Management:** Saves vector spaces (`data/vector.index`) and cross-referenced metadata JSON files directly to disk to preserve session tracking and application state.
+
 
 ---
 
@@ -70,17 +52,26 @@ Normalizes Dolly and FinQA datasets into a unified template. To accommodate loca
 
 ### Installation
 
-Ensure you have Python 3.11+ installed, then run:
+Ensure Python 3.11+ is installed, then pull dependencies and the automated browser engine:
 
 ```bash
-git clone https://github.com/Celsius273-web/Fine_Tuning_GPT2_with_Dolly_and_FinQA
-cd Fine_Tuning_GPT2_with_Dolly_and_FinQA
-pip install -r requirements.txt
+git clone https://github.com/Celsius273-web/Chronicle-AI-RAG
+cd Chronicle-AI-RAG
+pip install -r requirements_2.txt
+playwright install chromium
 
 ```
 
-### Running the Project
+### Configuration Details
 
-1. **Preprocess Data:** `python prepdata.py`
-2. **Train Adapter:** `python tune.py`
-3. **Run Benchmarks:** `python inference.py`
+1. Include the RSS streams inside `data/config.yaml`.
+
+2. Create a local `.env` file containing your Gemini API access credentials:
+
+MY_KEY=your_gemini_api_key_here
+
+3. Start the program with: python main.py
+
+* **`n`**: Fetches new data from RSS streams, rebuilds chunks, and updates the FAISS index.
+
+* **`p`**: Opens the natural language prompt terminal loop to query your localized vector space.
